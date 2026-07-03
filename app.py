@@ -142,12 +142,13 @@ def trigger_draft_sound(team_name):
 
 FILE_NAME = "_NVFL Draft Sheet 2026.xlsx"
 
-# --- LIVE ADP DATA SYNC ENGINE ---
+# --- LIVE ADP DATA SYNC ENGINE (FAST TIMEOUT ON FAIL) ---
 @st.cache_data(ttl=21600)
 def fetch_live_adp():
     try:
+        # Lowered timeout to 2 seconds flat to prevent page locking
         url = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=12&year=2026"
-        res = requests.get(url, timeout=5)
+        res = requests.get(url, timeout=2) 
         if res.status_code == 200:
             data = res.json()
             players_list = data.get("players", [])
@@ -164,6 +165,7 @@ def load_base_data():
     if os.path.exists(FILE_NAME):
         df = pd.read_excel(FILE_NAME, sheet_name='PlayerDB')
     else:
+        # Safety net fallback if local excel spreadsheet file isn't visible
         df = pd.DataFrame(columns=['Player', 'Team', 'Pos', 'Bye', 'PPR'])
     
     live_adp = fetch_live_adp()
@@ -246,7 +248,6 @@ with st.sidebar:
         st.markdown("---")
         st.markdown("### 🚦 My Queue Status")
         
-        # Calculate distance to user's next pick
         upcoming_picks = [
             p_idx for p_idx, t_name in st.session_state.custom_draft_order.items()
             if t_name == user_team and p_idx >= st.session_state.current_absolute_pick
@@ -263,6 +264,7 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="status-banner status-waiting">⏳ You are drafting in {picks_away} picks.</div>', unsafe_allow_html=True)
 
+    # Cleaned image fallback paths to prevent local file asset crash loops
     if os.path.exists("stare.png"):
         st.markdown(f"""
         <div class="stare-container">
@@ -293,9 +295,9 @@ with st.sidebar:
         search_query = st.text_input("Search Available Player Name")
         
         taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
-        avail_df = player_pool[~player_pool['Player'].isin(taken_names)]
+        avail_df = player_pool[~player_pool['Player'].isin(taken_names)] if not player_pool.empty else pd.DataFrame()
         
-        if search_query:
+        if search_query and not avail_df.empty:
             avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
             
         if not avail_df.empty:
@@ -408,34 +410,36 @@ with tab2:
     st.markdown("### 📋 Best Available By Position (Live Market ADP Rankings)")
     
     taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
-    remaining_players = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True)
     
-    # Generate 5 columns side-by-side
-    pos_cols = st.columns(5)
-    positions_list = ["QB", "RB", "WR", "TE", "DEF_K"]
-    
-    for idx, pos_group in enumerate(positions_list):
-        with pos_cols[idx]:
-            if pos_group == "DEF_K":
-                st.markdown("#### 🛡️ / 🦶 DEF & K")
-                pos_df = remaining_players[remaining_players['Pos'].isin(["DEF", "K"])].head(25)
-            else:
-                badge_style = f"pos-{pos_group}"
-                st.markdown(f"#### <span class='pos-badge {badge_style}'>{pos_group}</span>", unsafe_allow_html=True)
-                pos_df = remaining_players[remaining_players['Pos'] == pos_group].head(25)
-                
-            if not pos_df.empty:
-                for _, row in pos_df.iterrows():
-                    p_name = row['Player'].split('–')[0]
-                    adp_val = f"ADP: {round(row['PPR'], 1)}" if pd.notna(row['PPR']) else "Bye: " + str(row['Bye'])
-                    st.markdown(f"""
-                    <div class="cheat-row">
-                        <strong>{p_name}</strong>
-                        <span style="color: #8b949e; font-size: 11px;">{adp_val}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.write("*No available entries*")
+    if not player_pool.empty:
+        remaining_players = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True)
+        pos_cols = st.columns(5)
+        positions_list = ["QB", "RB", "WR", "TE", "DEF_K"]
+        
+        for idx, pos_group in enumerate(positions_list):
+            with pos_cols[idx]:
+                if pos_group == "DEF_K":
+                    st.markdown("#### 🛡️ / 🦶 DEF & K")
+                    pos_df = remaining_players[remaining_players['Pos'].isin(["DEF", "K"])].head(25)
+                else:
+                    badge_style = f"pos-{pos_group}"
+                    st.markdown(f"#### <span class='pos-badge {badge_style}'>{pos_group}</span>", unsafe_allow_html=True)
+                    pos_df = remaining_players[remaining_players['Pos'] == pos_group].head(25)
+                    
+                if not pos_df.empty:
+                    for _, row in pos_df.iterrows():
+                        p_name = row['Player'].split('–')[0]
+                        adp_val = f"ADP: {round(row['PPR'], 1)}" if pd.notna(row['PPR']) else "Bye: " + str(row['Bye'])
+                        st.markdown(f"""
+                        <div class="cheat-row">
+                            <strong>{p_name}</strong>
+                            <span style="color: #8b949e; font-size: 11px;">{adp_val}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.write("*No available entries*")
+    else:
+        st.info("Load a valid Player database to see recommended cheat sheets.")
 
 with tab3:
     st.subheader("Team Franchise Rosters")
