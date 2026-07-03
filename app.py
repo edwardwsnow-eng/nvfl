@@ -30,21 +30,18 @@ st.markdown("""
         background: linear-gradient(145deg, #420022, #1a000e);
         border: 1px solid #660033;
         border-radius: 6px;
-        padding: 4px;
-        margin: 2px 0px;
-        text-align: center;
+        padding: 8px;
+        margin: 4px 0px;
+    }
+    .rec-card {
+        background: linear-gradient(145deg, #1f0030, #0a0012);
+        border: 1px solid #9933ff;
+        border-radius: 6px;
+        padding: 10px;
+        margin: 6px 0px;
+        box-shadow: 0 0 8px rgba(153, 51, 255, 0.2);
     }
     .otc-active { border: 2px solid #ff007f !important; box-shadow: 0 0 12px #ff007f; }
-    
-    /* Smaller Logos to Save Space */
-    .team-logo-img {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-bottom: 2px;
-        border: 1px solid #880044;
-    }
 
     /* Mini Cheat Sheet Rows */
     .cheat-row-meta {
@@ -197,11 +194,12 @@ st.markdown("<hr style='margin: 8px 0px;'>", unsafe_allow_html=True)
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # 1. USER IDENTITY
     st.markdown("### 👤 User Identity Settings")
     user_team = st.selectbox("Select Your Managed Franchise:", ["Spectator / Commissioner Mode"] + TEAMS_16)
     
-    # 2. QUEUE STATUS BANNERS
+    # Establish whether this user has permission to log a pick right now
+    can_draft = (user_team == "Spectator / Commissioner Mode") or (user_team == otc_team)
+    
     if user_team != "Spectator / Commissioner Mode":
         st.markdown("---")
         st.markdown("### 🚦 My Queue Status")
@@ -217,45 +215,45 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="status-banner status-waiting">⏳ Drafting in {picks_away} picks.</div>', unsafe_allow_html=True)
 
-    # 3. LIVE PLAYER SUBMISSION INTERFACE
     st.markdown("---")
     st.markdown("### 🚀 Make Your Move")
     
-    # Use selected cheat sheet player if available, otherwise clear
-    default_search = st.session_state.selected_cheat_player if st.session_state.selected_cheat_player else ""
-    search_query = st.text_input("Search or Clicked Player Board Target", value=default_search)
-    
-    taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
-    avail_df = player_pool[~player_pool['Player'].isin(taken_names)] if not player_pool.empty else pd.DataFrame()
-    
-    if search_query and not avail_df.empty:
-        avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
+    if not can_draft:
+        st.warning(f"🔒 Drafting Locked. You select targets for **{user_team}**. Currently it is **{otc_team}'s** turn.")
+    else:
+        default_search = st.session_state.selected_cheat_player if st.session_state.selected_cheat_player else ""
+        search_query = st.text_input("Search or Clicked Player Board Target", value=default_search)
         
-    if not avail_df.empty:
-        target_row = avail_df.iloc[0]
-        player_adp = target_row['PPR']
+        taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
+        avail_df = player_pool[~player_pool['Player'].isin(taken_names)] if not player_pool.empty else pd.DataFrame()
         
-        if not is_keeper_phase and pd.notna(player_adp):
-            diff = round(display_pick_num - player_adp, 1)
-            diff_text = f"+{diff} (Steal)" if diff > 0 else f"{diff} (Reach)"
-            st.caption(f"📊 Live Market ADP: **{player_adp}** | Value Diff: **{diff_text}**")
+        if search_query and not avail_df.empty:
+            avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
             
-        st.success(f"Selected Target: {target_row['Player']} ({target_row['Pos']})")
-        if st.button("🔥 SUBMIT BOARD PICK", use_container_width=True):
-            st.session_state.drafted_players[st.session_state.current_absolute_pick] = {
-                "Player": target_row['Player'],
-                "Pos": target_row['Pos'],
-                "Team": target_row['Team'],
-                "DraftedBy": otc_team,
-                "IsKeeper": is_keeper_phase
-            }
-            trigger_draft_sound(otc_team)
-            st.session_state.current_absolute_pick += 1
-            st.session_state.timer_start = time.time()
-            st.session_state.selected_cheat_player = ""  # Reset lock
-            st.rerun()
+        if not avail_df.empty:
+            target_row = avail_df.iloc[0]
+            player_adp = target_row['PPR']
+            
+            if not is_keeper_phase and pd.notna(player_adp):
+                diff = round(display_pick_num - player_adp, 1)
+                diff_text = f"+{diff} (Steal)" if diff > 0 else f"{diff} (Reach)"
+                st.caption(f"📊 Live Market ADP: **{player_adp}** | Value Diff: **{diff_text}**")
+                
+            st.success(f"Selected Target: {target_row['Player']} ({target_row['Pos']})")
+            if st.button("🔥 SUBMIT BOARD PICK", use_container_width=True):
+                st.session_state.drafted_players[st.session_state.current_absolute_pick] = {
+                    "Player": target_row['Player'],
+                    "Pos": target_row['Pos'],
+                    "Team": target_row['Team'],
+                    "DraftedBy": otc_team,
+                    "IsKeeper": is_keeper_phase
+                }
+                trigger_draft_sound(otc_team)
+                st.session_state.current_absolute_pick += 1
+                st.session_state.timer_start = time.time()
+                st.session_state.selected_cheat_player = ""  
+                st.rerun()
 
-    # 5. ADMIN UTILITIES (PUSHED TO BOTTOM)
     st.markdown("<br><br><br><hr style='border-top: 1px solid #660033;'>", unsafe_allow_html=True)
     st.markdown("### 🛠️ Administration (Bottom)")
     st.session_state.time_limit = st.number_input("Adjust Clock Speed Limit (Seconds)", min_value=15, max_value=300, value=st.session_state.time_limit, step=15)
@@ -280,79 +278,95 @@ with st.sidebar:
                 st.rerun()
 
 # --- TABS INTERFACE ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Live Draft Matrix Board", "📋 Interactive Cheat Sheets", "🏆 Team Rosters", "📋 Live Drafted Breakdown"])
+tab1, tab2, tab3, tab4 = st.tabs(["🎯 My Team Dashboard", "📋 Interactive Cheat Sheets", "🏆 League-Wide Rosters", "📋 Live Drafted Breakdown"])
 
 with tab1:
-    st.markdown("### 🔐 Pre-Draft Keeper Phase")
-    for kr in [1, 2]:
-        st.markdown(f"**Keeper Round {kr}**")
-        k_cols = st.columns(16)
-        for i in range(1, 17):
-            k_abs_pick = ((kr - 1) * 16) + i
-            k_team, _, _, _ = get_draft_metadata(k_abs_pick)
-            k_logo = TEAM_ASSETS.get(k_team, {}).get("logo", "")
-            
-            if k_abs_pick in st.session_state.drafted_players:
-                p_data = st.session_state.drafted_players[k_abs_pick]
-                p_pos = p_data['Pos']
-                k_cols[i-1].markdown(f"""
-                <div class="board-card board-card-{p_pos}">
-                    <img class="team-logo-img" src="{k_logo}"><br>
-                    <strong style="color: white; font-size: 10px;">{p_data['Player'].split('–')[0][:7]}</strong><br>
-                    <span class="pos-badge pos-{p_pos}">{p_pos}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                is_otc = (k_abs_pick == st.session_state.current_absolute_pick)
-                card_style = "board-card otc-active" if is_otc else "board-card"
-                opacity = "1.0" if is_otc else "0.3"
-                k_cols[i-1].markdown(f"""
-                <div class="{card_style}" style="opacity: {opacity};">
-                    <img class="team-logo-img" src="{k_logo}"><br>
-                    <small style="color: #ecc4dc; font-size:9px;">{k_team[:5]}</small>
-                </div>
-                """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("### 🏈 Main Draft Board Matrix")
-    for r in range(1, TOTAL_REGULAR_ROUNDS + 1):
-        st.markdown(f"**Round {r}**")
-        cols = st.columns(16)
-        for i in range(1, 17):
-            reg_pick_offset = ((r - 1) * 16) + i
-            calc_abs_pick = TOTAL_KEEPER_PICKS + reg_pick_offset
-            
-            display_team, _, _, _ = get_draft_metadata(calc_abs_pick)
-            team_logo = TEAM_ASSETS.get(display_team, {}).get("logo", "")
-            
-            if calc_abs_pick in st.session_state.drafted_players:
-                pick_data = st.session_state.drafted_players[calc_abs_pick]
-                p_pos = pick_data['Pos']
-                
-                cols[i-1].markdown(f"""
-                <div class="board-card board-card-{p_pos}">
-                    <small style="color: #ecc4dc; font-size: 8px;">Pk {reg_pick_offset}</small><br>
-                    <img class="team-logo-img" src="{team_logo}"><br>
-                    <strong style="color: white; font-size: 10px;">{pick_data['Player'].split('–')[0][:7]}</strong><br>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                is_otc = (calc_abs_pick == st.session_state.current_absolute_pick)
-                card_style = "board-card otc-active" if is_otc else "board-card"
-                opacity = "1.0" if is_otc else "0.4"
-                
-                cols[i-1].markdown(f"""
-                <div class="{card_style}" style="opacity: {opacity};">
-                    <small style="color: #ecc4dc; font-size: 8px;">Pk {reg_pick_offset}</small><br>
-                    <img class="team-logo-img" src="{team_logo}"><br>
-                    <strong style="color: #ecc4dc; font-size: 9px;">{display_team[:5]}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-
-with tab2:
-    st.markdown("### 📋 Click a Player Name to Stage & Draft Instantly")
+    # Handle Spectator state gracefully
+    active_dashboard_team = user_team if user_team != "Spectator / Commissioner Mode" else otc_team
+    t_logo = TEAM_ASSETS.get(active_dashboard_team, {}).get("logo", "")
+    
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+        <img src="{t_logo}" style="width: 50px; border-radius: 50%; border: 2px solid #ff007f;">
+        <div>
+            <h2 style="margin: 0px;">{active_dashboard_team.upper()} ROSTER DASHBOARD</h2>
+            <p style="color: #ecc4dc; margin: 0px; font-size: 14px;">Tracking live drafting, depth builds, and locked keeper slots</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
+    
+    # --- 📈 DYNAMIC TOP 3 RECOMMENDATIONS SECTION ---
+    st.markdown("### ⚡ War Room Projections: Top 3 Recommended Targets")
+    if not player_pool.empty:
+        # Filter pool down to best available untaken players sorted by high priority value (ADP)
+        rec_pool = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True).head(3)
+        
+        if not rec_pool.empty:
+            rec_cols = st.columns(3)
+            for r_idx, (_, r_player) in enumerate(rec_pool.iterrows()):
+                with rec_cols[r_idx]:
+                    p_name_short = r_player['Player'].split('–')[0]
+                    st.markdown(f"""
+                    <div class="rec-card">
+                        <span style="color: #ff3366; font-family: 'Orbitron'; font-size: 10px; font-weight: bold;">RECOMMENDED OPTION #{r_idx+1}</span><br>
+                        <strong style="color: #ffffff; font-size: 17px;">{p_name_short}</strong>
+                        <span class="pos-badge pos-{r_player['Pos']}">{r_player['Pos']}</span><br>
+                        <span style="font-size: 13px; color: #ffcc00; font-family: 'Orbitron';">Market ADP: {round(r_player['PPR'], 1)} • Bye: {r_player['Bye']}</span><br>
+                        <span style="font-size: 12px; color: #ecc4dc;">Current Team: {r_player['Team']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    # Let them snap-queue the player immediately into the sidebar build panel
+                    if can_draft:
+                        if st.button(f"🎯 Queue {p_name_short}", key=f"rec-queue-{r_idx}"):
+                            st.session_state.selected_cheat_player = r_player['Player']
+                            st.rerun()
+        else:
+            st.write("*No recommendation targets left in underlying database pool.*")
+    else:
+        st.write("*Load PlayerDB matrix to enable smart target tracking recommendations.*")
+        
+    st.markdown("<hr style='border-top: 1px dashed #660033; margin: 15px 0px;'>", unsafe_allow_html=True)
+    
+    # Isolate current picks belonging to this chosen squad
+    my_selections = [p for p in st.session_state.drafted_players.values() if p['DraftedBy'] == active_dashboard_team]
+    
+    dash_col1, dash_col2 = st.columns([1, 2])
+    
+    with dash_col1:
+        st.markdown("### 📋 Roster Slot Allocations")
+        # Standard tracking metrics per position group
+        counts = {"QB": 0, "RB": 0, "WR": 0, "TE": 0, "DEF": 0, "K": 0}
+        for p in my_selections:
+            if p['Pos'] in counts:
+                counts[p['Pos']] += 1
+                
+        st.markdown(f"**Quarterbacks (QB):** `{counts['QB']}`")
+        st.markdown(f"**Running Backs (RB):** `{counts['RB']}`")
+        st.markdown(f"**Wide Receivers (WR):** `{counts['WR']}`")
+        st.markdown(f"**Tight Ends (TE):** `{counts['TE']}`")
+        st.markdown(f"**Defense (DEF):** `{counts['DEF']}`")
+        st.markdown(f"**Kickers (K):** `{counts['K']}`")
+        st.markdown(f"**Total Drafted Capital:** `{len(my_selections)} Players Loaded`")
+        
+    with dash_col2:
+        st.markdown("### 🏈 Selected Player Card Stream")
+        if my_selections:
+            for p in my_selections:
+                lbl = "🔒 KEEPER LOCK • " if p.get('IsKeeper') else ""
+                st.markdown(f"""
+                <div class="board-card">
+                    <span style="color: #ffcc00; font-family: 'Orbitron'; font-size: 11px;">{lbl}{p['Team']} (Bye {player_pool[player_pool['Player']==p['Player']]['Bye'].values[0] if p['Player'] in player_pool['Player'].values else 'N/A'})</span><br>
+                    <strong style="color: white; font-size: 16px;">{p['Player'].split('–')[0]}</strong> 
+                    <span class="pos-badge pos-{p['Pos']}">{p['Pos']}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No players compiled to this franchise roster yet. Select players from the interactive cheat sheet when it is your turn on the clock.")
+
+with tab2:
+    st.markdown("### 📋 Best Available Ordered Best to Worse (Live Market ADP Rankings)")
     
     if not player_pool.empty:
         remaining_players = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True)
@@ -375,10 +389,13 @@ with tab2:
                         p_short_name = p_full_name.split('–')[0]
                         adp_val = f"ADP: {round(row['PPR'], 1)}" if pd.notna(row['PPR']) else f"B: {row['Bye']}"
                         
-                        # Clickable selection button mechanics
-                        if st.button(f"➕ {p_short_name}", key=f"btn-{p_full_name}-{idx}"):
-                            st.session_state.selected_cheat_player = p_full_name
-                            st.rerun()
+                        if can_draft:
+                            if st.button(f"➕ {p_short_name}", key=f"btn-{p_full_name}-{idx}"):
+                                st.session_state.selected_cheat_player = p_full_name
+                                st.rerun()
+                        else:
+                            st.button(f"🔒 {p_short_name}", key=f"btn-{p_full_name}-{idx}", disabled=True)
+                            
                         st.markdown(f"<span class='cheat-row-meta'>{adp_val} ({row['Team']})</span><hr style='margin:3px 0;'>", unsafe_allow_html=True)
                 else:
                     st.write("*Empty*")
