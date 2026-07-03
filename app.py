@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import time
+import requests
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="NVFL War Room 2026", layout="wide", initial_sidebar_state="expanded")
@@ -9,7 +10,7 @@ st.set_page_config(page_title="NVFL War Room 2026", layout="wide", initial_sideb
 # --- CUSTOM CSS WITH ADDED FLOATING IMAGE ANIMATION ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght=400;700&family=Rajdhani:wght=500;700&display=swap');
     
     .stApp { background-color: #0d1117; color: #c9d1d9; font-family: 'Rajdhani', sans-serif; }
     h1, h2, h3, h4 { font-family: 'Orbitron', sans-serif; color: #58a6ff; text-shadow: 0 0 10px rgba(88,166,255,0.4); }
@@ -51,17 +52,45 @@ st.markdown("""
         border: 1px solid #484f58;
     }
 
-    /* 👁️ ANIMATED STARE GRAPHIC EFFECT 👁️ */
+    /* Mini Cheat Sheet Rows */
+    .cheat-row {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        padding: 6px;
+        margin-bottom: 4px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* User Notice Banners */
+    .status-banner {
+        padding: 12px;
+        border-radius: 8px;
+        font-family: 'Orbitron';
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+    .status-otc { background-color: rgba(0, 204, 102, 0.15); border: 1px solid #00cc66; color: #00cc66; box-shadow: 0 0 10px rgba(0,204,102,0.2); animation: pulse 1.5s infinite; }
+    .status-next { background-color: rgba(255, 204, 0, 0.15); border: 1px solid #ffcc00; color: #ffcc00; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
+    .status-waiting { background-color: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; color: #58a6ff; }
+
+    /* Animated Stare Graphic Effect */
     .stare-container {
         text-align: center;
-        margin-top: 20px;
+        margin-top: 10px;
         padding: 10px;
         border-radius: 12px;
         background: rgba(255, 51, 102, 0.05);
         border: 1px dashed rgba(255, 51, 102, 0.2);
     }
     .stare-img {
-        width: 85%;
+        width: 75%;
         border-radius: 10px;
         animation: floatStare 4s ease-in-out infinite alternate;
         filter: drop-shadow(0 0 12px rgba(88,166,255,0.3));
@@ -104,6 +133,7 @@ DEFAULT_HORN = "https://actions.google.com/sounds/v1/alarms/air_horn_so_loud.ogg
 TEAMS_16 = list(TEAM_ASSETS.keys())
 TOTAL_REGULAR_ROUNDS = 15
 TOTAL_KEEPER_PICKS = 32
+TOTAL_ABS_PICKS = TOTAL_KEEPER_PICKS + (TOTAL_REGULAR_ROUNDS * 16)
 
 def trigger_draft_sound(team_name):
     team_sound = TEAM_ASSETS.get(team_name, {}).get("sound", "")
@@ -112,13 +142,57 @@ def trigger_draft_sound(team_name):
 
 FILE_NAME = "_NVFL Draft Sheet 2026.xlsx"
 
+# --- LIVE ADP DATA SYNC ENGINE ---
+@st.cache_data(ttl=21600)
+def fetch_live_adp():
+    try:
+        url = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=12&year=2026"
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            players_list = data.get("players", [])
+            if players_list:
+                df_adp = pd.DataFrame(players_list)
+                df_adp['clean_name'] = df_adp['name'].str.lower().str.strip()
+                return df_adp[['clean_name', 'adp']]
+    except Exception:
+        pass
+    return None
+
 @st.cache_data
 def load_base_data():
     if os.path.exists(FILE_NAME):
-        return pd.read_excel(FILE_NAME, sheet_name='PlayerDB')
-    return pd.DataFrame(columns=['Player', 'Team', 'Pos', 'Bye', 'PPR'])
+        df = pd.read_excel(FILE_NAME, sheet_name='PlayerDB')
+    else:
+        df = pd.DataFrame(columns=['Player', 'Team', 'Pos', 'Bye', 'PPR'])
+    
+    live_adp = fetch_live_adp()
+    if live_adp is not None and not df.empty:
+        df['clean_name'] = df['Player'].str.split('–').str[0].str.lower().str.strip()
+        df = df.merge(live_adp, on='clean_name', how='left')
+        df['PPR'] = df['adp'].fillna(df['PPR'])
+        df.drop(columns=['clean_name', 'adp'], errors='ignore', inplace=True)
+        
+    return df
 
 player_pool = load_base_data()
+
+# --- INITIALIZE CORE DRAFT SLOTS ---
+if 'custom_draft_order' not in st.session_state:
+    order_map = {}
+    for abs_pick in range(1, TOTAL_ABS_PICKS + 1):
+        if abs_pick <= TOTAL_KEEPER_PICKS:
+            idx = (abs_pick - 1) % 16
+            order_map[abs_pick] = TEAMS_16[idx]
+        else:
+            reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
+            round_num = ((reg_pick_num - 1) // 16) + 1
+            pick_in_round = (reg_pick_num - 1) % 16
+            if round_num % 2 != 0:
+                order_map[abs_pick] = TEAMS_16[pick_in_round]
+            else:
+                order_map[abs_pick] = TEAMS_16[15 - pick_in_round]
+    st.session_state.custom_draft_order = order_map
 
 # --- STATE MANAGEMENT ---
 if 'drafted_players' not in st.session_state:
@@ -129,21 +203,14 @@ if 'timer_start' not in st.session_state:
     st.session_state.timer_start = time.time()
 
 def get_draft_metadata(abs_pick):
+    assigned_team = st.session_state.custom_draft_order.get(abs_pick, "Unknown")
     if abs_pick <= TOTAL_KEEPER_PICKS:
         k_round = ((abs_pick - 1) // 16) + 1
-        idx = (abs_pick - 1) % 16
-        return TEAMS_16[idx], f"Keeper Round {k_round}", True, abs_pick
+        return assigned_team, f"Keeper Round {k_round}", True, abs_pick
     
     reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
     round_num = ((reg_pick_num - 1) // 16) + 1
-    pick_in_round = (reg_pick_num - 1) % 16
-    
-    if round_num % 2 != 0:
-        team = TEAMS_16[pick_in_round]
-    else:
-        team = TEAMS_16[15 - pick_in_round]
-        
-    return team, f"Round {round_num}", False, reg_pick_num
+    return assigned_team, f"Round {round_num}", False, reg_pick_num
 
 otc_team, round_label, is_keeper_phase, display_pick_num = get_draft_metadata(st.session_state.current_absolute_pick)
 
@@ -152,16 +219,18 @@ st.markdown(f"<h1 style='text-align: center; margin-bottom: 0px;'>🚨 NVFL DRAF
 st.markdown(f"<h3 style='text-align: center; color: #ffcc00; margin-top: 0px;'>{round_label.upper()} • {'KEEPER SLOT' if is_keeper_phase else f'PICK {display_pick_num}'} • {otc_team.upper()} IS ON THE CLOCK</h3>", unsafe_allow_html=True)
 st.markdown("---")
 
-# --- SIDEBAR: CLOCK, CONTROLS & NEW ANIMATED GRAPHIC ---
+# --- SIDEBAR CONTROLS ---
 with st.sidebar:
+    st.markdown("### 👤 User Identity Settings")
+    user_team = st.selectbox("Select Your Managed Franchise:", ["Spectator / Commissioner Mode"] + TEAMS_16)
+    
+    st.markdown("---")
     st.markdown("### ⏱️ Draft Room Clock")
     time_limit = st.number_input("Set Clock (Seconds)", min_value=15, max_value=300, value=90, step=15)
     
     elapsed = int(time.time() - st.session_state.timer_start)
     remaining = max(0, time_limit - elapsed)
-    
-    progress_pct = min(1.0, float(elapsed / time_limit))
-    st.progress(progress_pct)
+    st.progress(min(1.0, float(elapsed / time_limit)))
     
     if remaining > 0:
         st.metric(label="Time Remaining", value=f"{remaining}s")
@@ -172,23 +241,54 @@ with st.sidebar:
         st.session_state.timer_start = time.time()
         st.rerun()
 
-    # 👁️ INJECTING THE HOVERING ANIMATION IMAGE HERE 👁️
+    # --- DYNAMIC PERSONALIZED QUEUE UPDATER ---
+    if user_team != "Spectator / Commissioner Mode":
+        st.markdown("---")
+        st.markdown("### 🚦 My Queue Status")
+        
+        # Calculate distance to user's next pick
+        upcoming_picks = [
+            p_idx for p_idx, t_name in st.session_state.custom_draft_order.items()
+            if t_name == user_team and p_idx >= st.session_state.current_absolute_pick
+        ]
+        
+        if not upcoming_picks:
+            st.markdown('<div class="status-banner status-waiting"> Roster Complete or No Upcoming Picks Found</div>', unsafe_allow_html=True)
+        else:
+            picks_away = upcoming_picks[0] - st.session_state.current_absolute_pick
+            if picks_away == 0:
+                st.markdown('<div class="status-banner status-otc">🎉 YOU ARE ON THE CLOCK!<br>Make your move!</div>', unsafe_allow_html=True)
+            elif picks_away == 1:
+                st.markdown('<div class="status-banner status-next">🚨 YOU ARE NEXT!<br>Get your queue ready!</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="status-banner status-waiting">⏳ You are drafting in {picks_away} picks.</div>', unsafe_allow_html=True)
+
     if os.path.exists("stare.png"):
-        st.markdown("""
+        st.markdown(f"""
         <div class="stare-container">
             <small style="color: #ff3366; font-family: 'Orbitron'; font-weight: bold; letter-spacing: 1px;">🚨 PRESSURE IS ON 🚨</small><br><br>
             <img class="stare-img" src="app/static/stare.png">
         </div>
         """, unsafe_allow_html=True)
-    else:
-        # Fallback if file isn't uploaded yet or named differently
-        st.info("💡 Upload your photo to GitHub as 'stare.png' to activate the War Room pressure animation!")
 
     st.markdown("---")
     st.markdown("### 🛠️ Commish Dashboard")
     is_admin = st.checkbox("Enable Admin Drafting Mode", value=True)
     
     if is_admin:
+        with st.expander("⚙️ Swap Board Picks / Trade Manager"):
+            st.markdown("<small style='color: #8b949e;'>Trade absolute draft picks here.</small>", unsafe_allow_html=True)
+            pick_a = st.number_input("Pick X (Absolute #)", min_value=1, max_value=TOTAL_ABS_PICKS, value=33, step=1)
+            pick_b = st.number_input("Pick Y (Absolute #)", min_value=1, max_value=TOTAL_ABS_PICKS, value=34, step=1)
+            
+            if st.button("🔄 Swap Ownership Slots"):
+                team_x = st.session_state.custom_draft_order[pick_a]
+                team_y = st.session_state.custom_draft_order[pick_b]
+                st.session_state.custom_draft_order[pick_a] = team_y
+                st.session_state.custom_draft_order[pick_b] = team_x
+                st.success(f"Swapped Picks!")
+                st.rerun()
+                
         st.info(f"Drafting for: **{otc_team}**")
         search_query = st.text_input("Search Available Player Name")
         
@@ -200,6 +300,13 @@ with st.sidebar:
             
         if not avail_df.empty:
             target_row = avail_df.iloc[0]
+            player_adp = target_row['PPR']
+            
+            if not is_keeper_phase and pd.notna(player_adp):
+                diff = round(display_pick_num - player_adp, 1)
+                diff_text = f"+{diff} (Steal)" if diff > 0 else f"{diff} (Reach)"
+                st.caption(f"📊 Market Live ADP: **{player_adp}** | Value Diff: **{diff_text}**")
+                
             st.success(f"Top Match: {target_row['Player']} ({target_row['Pos']})")
             if st.button("🚀 SUBMIT PICK"):
                 st.session_state.drafted_players[st.session_state.current_absolute_pick] = {
@@ -225,7 +332,7 @@ with st.sidebar:
                 st.rerun()
 
 # --- TABS INTERFACE ---
-tab1, tab2, tab3 = st.tabs(["📊 Live Draft Matrix Board", "📋 Depth & Best Available", "🏆 Team Rosters"])
+tab1, tab2, tab3 = st.tabs(["📊 Live Draft Matrix Board", "📋 Positional Cheat Sheets", "🏆 Team Rosters"])
 
 with tab1:
     st.markdown("### 🔐 Pre-Draft Keeper Phase")
@@ -234,7 +341,7 @@ with tab1:
         k_cols = st.columns(16)
         for i in range(1, 17):
             k_abs_pick = ((kr - 1) * 16) + i
-            k_team = TEAMS_16[i-1]
+            k_team, _, _, _ = get_draft_metadata(k_abs_pick)
             k_logo = TEAM_ASSETS.get(k_team, {}).get("logo", "")
             
             if k_abs_pick in st.session_state.drafted_players:
@@ -254,12 +361,12 @@ with tab1:
                 k_cols[i-1].markdown(f"""
                 <div class="{card_style}" style="opacity: {opacity};">
                     <img class="team-logo-img" src="{k_logo}"><br>
-                    <small style="color: #8b949e;">{k_team[:8]}</small>
+                    <small style="color: #8b949e;">{k_team[:8]}</small><br>
+                    <small style="color: #58a6ff; font-size:9px;">Abs {k_abs_pick}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
     st.markdown("---")
-    
     st.markdown("### 🏈 Main Draft Board Matrix")
     for r in range(1, TOTAL_REGULAR_ROUNDS + 1):
         st.markdown(f"**Round {r}**")
@@ -292,21 +399,43 @@ with tab1:
                 <div class="{card_style}" style="opacity: {opacity};">
                     <small style="color: #8b949e;">Pk {reg_pick_offset}</small><br>
                     <img class="team-logo-img" src="{team_logo}"><br>
-                    <strong style="color: #8b949e; font-size: 10px;">{display_team[:8]}</strong>
+                    <strong style="color: #8b949e; font-size: 10px;">{display_team[:8]}</strong><br>
+                    <small style="color: #58a6ff; font-size:9px;">Abs {calc_abs_pick}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
 with tab2:
-    st.subheader("Available Pool Metrics")
+    st.markdown("### 📋 Best Available By Position (Live Market ADP Rankings)")
+    
     taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
-    remaining_players = player_pool[~player_pool['Player'].isin(taken_names)]
+    remaining_players = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True)
     
-    counts = remaining_players['Pos'].value_counts()
-    st.markdown("#### 📊 Players Remaining By Position")
-    st.bar_chart(counts)
+    # Generate 5 columns side-by-side
+    pos_cols = st.columns(5)
+    positions_list = ["QB", "RB", "WR", "TE", "DEF_K"]
     
-    st.markdown("#### 📋 Top Available Board")
-    st.dataframe(remaining_players[['Player', 'Pos', 'Bye', 'PPR']].head(50), use_container_width=True)
+    for idx, pos_group in enumerate(positions_list):
+        with pos_cols[idx]:
+            if pos_group == "DEF_K":
+                st.markdown("#### 🛡️ / 🦶 DEF & K")
+                pos_df = remaining_players[remaining_players['Pos'].isin(["DEF", "K"])].head(25)
+            else:
+                badge_style = f"pos-{pos_group}"
+                st.markdown(f"#### <span class='pos-badge {badge_style}'>{pos_group}</span>", unsafe_allow_html=True)
+                pos_df = remaining_players[remaining_players['Pos'] == pos_group].head(25)
+                
+            if not pos_df.empty:
+                for _, row in pos_df.iterrows():
+                    p_name = row['Player'].split('–')[0]
+                    adp_val = f"ADP: {round(row['PPR'], 1)}" if pd.notna(row['PPR']) else "Bye: " + str(row['Bye'])
+                    st.markdown(f"""
+                    <div class="cheat-row">
+                        <strong>{p_name}</strong>
+                        <span style="color: #8b949e; font-size: 11px;">{adp_val}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.write("*No available entries*")
 
 with tab3:
     st.subheader("Team Franchise Rosters")
@@ -323,4 +452,31 @@ with tab3:
                     st.markdown(f"• {lbl}**{tp['Player']}** <span class='pos-badge pos-{tp['Pos']}'>{tp['Pos']}</span>", unsafe_allow_html=True)
             else:
                 st.write("*No roster entries recorded*")
-            
+                
+    st.markdown("---")
+    st.markdown("### 💾 Export Master Draft Log")
+    
+    if st.session_state.drafted_players:
+        export_records = []
+        for pick_num, details in sorted(st.session_state.drafted_players.items()):
+            export_records.append({
+                "Absolute Pick": pick_num,
+                "Fantasy Team": details["DraftedBy"],
+                "Player": details["Player"],
+                "Position": details["Pos"],
+                "NFL Team": details["Team"],
+                "Is Keeper": "Yes" if details["IsKeeper"] else "No"
+            })
+        
+        export_df = pd.DataFrame(export_records)
+        csv_data = export_df.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="📥 Download Rosters CSV",
+            data=csv_data,
+            file_name="NVFL_2026_Draft_Results.csv",
+            mime="text/csv",
+            help="Click here to download a complete breakdown of all team rosters and drafted picks."
+        )
+    else:
+        st.warning("No players have been drafted yet. Complete a few picks to unlock the CSV exporter!")
