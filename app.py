@@ -1,4 +1,5 @@
-import streamlit as st
+
+   import streamlit as st
 import pandas as pd
 import os
 import time
@@ -7,13 +8,14 @@ import requests
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="NVFL War Room 2026", layout="wide", initial_sidebar_state="expanded")
 
-# --- CUSTOM CSS WITH ADDED FLOATING IMAGE ANIMATION ---
+# --- CUSTOM PINK CSS WITH REORGANIZED LAYOUT ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght=400;700&family=Rajdhani:wght=500;700&display=swap');
     
-    .stApp { background-color: #0d1117; color: #c9d1d9; font-family: 'Rajdhani', sans-serif; }
-    h1, h2, h3, h4 { font-family: 'Orbitron', sans-serif; color: #58a6ff; text-shadow: 0 0 10px rgba(88,166,255,0.4); }
+    /* Vibrant Pink Theme Overhaul */
+    .stApp { background-color: #2b0016; color: #ecc4dc; font-family: 'Rajdhani', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Orbitron', sans-serif; color: #ff007f; text-shadow: 0 0 10px rgba(255,0,127,0.4); }
     
     /* Neon Position Badges & Heatmap Cards */
     .pos-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-family: 'Orbitron'; font-size: 11px; text-align: center; display: inline-block;}
@@ -26,8 +28,8 @@ st.markdown("""
     
     /* Card Styling */
     .board-card {
-        background: linear-gradient(145deg, #1f2937, #111827);
-        border: 1px solid #374151;
+        background: linear-gradient(145deg, #420022, #1a000e);
+        border: 1px solid #660033;
         border-radius: 8px;
         padding: 8px;
         margin: 4px 0px;
@@ -41,7 +43,7 @@ st.markdown("""
     .board-card-DEF { border: 1px solid #9933ff; box-shadow: inset 0 0 5px rgba(153,51,255,0.2); }
     .board-card-K { border: 1px solid #e67e22; box-shadow: inset 0 0 5px rgba(230,126,34,0.2); }
     
-    .otc-active { border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; animation: pulse 1.5s infinite; }
+    .otc-active { border: 2px solid #ff007f !important; box-shadow: 0 0 15px #ff007f; animation: pulse 1.5s infinite; }
     
     .team-logo-img {
         width: 35px;
@@ -49,13 +51,13 @@ st.markdown("""
         border-radius: 50%;
         object-fit: cover;
         margin-bottom: 4px;
-        border: 1px solid #484f58;
+        border: 1px solid #880044;
     }
 
     /* Mini Cheat Sheet Rows */
     .cheat-row {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: #3d0020;
+        border: 1px solid #5c0030;
         border-radius: 4px;
         padding: 6px;
         margin-bottom: 4px;
@@ -76,9 +78,9 @@ st.markdown("""
         font-size: 14px;
         letter-spacing: 0.5px;
     }
-    .status-otc { background-color: rgba(0, 204, 102, 0.15); border: 1px solid #00cc66; color: #00cc66; box-shadow: 0 0 10px rgba(0,204,102,0.2); animation: pulse 1.5s infinite; }
+    .status-otc { background-color: rgba(255, 0, 127, 0.2); border: 1px solid #ff007f; color: #ff007f; box-shadow: 0 0 10px rgba(255,0,127,0.3); animation: pulse 1.5s infinite; }
     .status-next { background-color: rgba(255, 204, 0, 0.15); border: 1px solid #ffcc00; color: #ffcc00; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
-    .status-waiting { background-color: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; color: #58a6ff; }
+    .status-waiting { background-color: rgba(236, 196, 220, 0.1); border: 1px solid #ecc4dc; color: #ecc4dc; }
 
     /* Animated Stare Graphic Effect */
     .stare-container {
@@ -86,20 +88,20 @@ st.markdown("""
         margin-top: 10px;
         padding: 10px;
         border-radius: 12px;
-        background: rgba(255, 51, 102, 0.05);
-        border: 1px dashed rgba(255, 51, 102, 0.2);
+        background: rgba(255, 0, 127, 0.05);
+        border: 1px dashed rgba(255, 0, 127, 0.2);
     }
     .stare-img {
         width: 75%;
         border-radius: 10px;
         animation: floatStare 4s ease-in-out infinite alternate;
-        filter: drop-shadow(0 0 12px rgba(88,166,255,0.3));
+        filter: drop-shadow(0 0 12px rgba(255,0,127,0.3));
     }
     
     @keyframes floatStare {
-        0% { transform: translateY(0px) scale(0.98) rotate(0deg); filter: drop-shadow(0 0 8px rgba(255,51,102,0.3)); }
-        50% { filter: drop-shadow(0 0 18px rgba(88,166,255,0.6)); }
-        100% { transform: translateY(-12px) scale(1.02) rotate(1deg); filter: drop-shadow(0 0 8px rgba(255,51,102,0.3)); }
+        0% { transform: translateY(0px) scale(0.98) rotate(0deg); filter: drop-shadow(0 0 8px rgba(255,0,127,0.3)); }
+        50% { filter: drop-shadow(0 0 18px rgba(255,0,127,0.5)); }
+        100% { transform: translateY(-12px) scale(1.02) rotate(1deg); filter: drop-shadow(0 0 8px rgba(255,0,127,0.3)); }
     }
     @keyframes pulse {
         0% { opacity: 0.8; }
@@ -111,22 +113,22 @@ st.markdown("""
 
 # --- TEAM MATRIX ---
 TEAM_ASSETS = {
-    "Sleeper Cell": {"logo": "https://placehold.co/100x100/1f2937/ff3366?text=SC", "sound": "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"},
-    "Phantasm": {"logo": "https://placehold.co/100x100/1f2937/0099ff?text=PH", "sound": ""},
-    "Icelanders": {"logo": "https://placehold.co/100x100/1f2937/00cc66?text=ICE", "sound": ""},
-    "El Nino": {"logo": "https://placehold.co/100x100/1f2937/ffcc00?text=EN", "sound": ""},
-    "Buttheads": {"logo": "https://placehold.co/100x100/1f2937/9933ff?text=BH", "sound": "https://actions.google.com/sounds/v1/sports/soccer_stadium_whistle.ogg"},
-    "Big Boys Big Work": {"logo": "https://placehold.co/100x100/1f2937/ffffff?text=BB", "sound": ""},
-    "Turbo-Ginz": {"logo": "https://placehold.co/100x100/1f2937/e67e22?text=TG", "sound": ""},
-    "Luddite": {"logo": "https://placehold.co/100x100/1f2937/ff3366?text=LUD", "sound": ""},
-    "Achains": {"logo": "https://placehold.co/100x100/1f2937/0099ff?text=ACH", "sound": ""},
-    "Daddy's Dogs": {"logo": "https://placehold.co/100x100/1f2937/00cc66?text=DDG", "sound": ""},
-    "TDs and Beers": {"logo": "https://placehold.co/100x100/1f2937/ffcc00?text=TD", "sound": ""},
-    "DD Riders": {"logo": "https://placehold.co/100x100/1f2937/9933ff?text=DDR", "sound": ""},
-    "Nasty": {"logo": "https://placehold.co/100x100/1f2937/ffffff?text=NY", "sound": ""},
-    "Red Hammer": {"logo": "https://placehold.co/100x100/1f2937/ff3366?text=RH", "sound": ""},
-    "Expansion Team 15": {"logo": "https://placehold.co/100x100/1f2937/8b949e?text=E15", "sound": ""},
-    "Expansion Team 16": {"logo": "https://placehold.co/100x100/1f2937/8b949e?text=E16", "sound": ""}
+    "Sleeper Cell": {"logo": "https://placehold.co/100x100/420022/ff3366?text=SC", "sound": "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"},
+    "Phantasm": {"logo": "https://placehold.co/100x100/420022/0099ff?text=PH", "sound": ""},
+    "Icelanders": {"logo": "https://placehold.co/100x100/420022/00cc66?text=ICE", "sound": ""},
+    "El Nino": {"logo": "https://placehold.co/100x100/420022/ffcc00?text=EN", "sound": ""},
+    "Buttheads": {"logo": "https://placehold.co/100x100/420022/9933ff?text=BH", "sound": "https://actions.google.com/sounds/v1/sports/soccer_stadium_whistle.ogg"},
+    "Big Boys Big Work": {"logo": "https://placehold.co/100x100/420022/ffffff?text=BB", "sound": ""},
+    "Turbo-Ginz": {"logo": "https://placehold.co/100x100/420022/e67e22?text=TG", "sound": ""},
+    "Luddite": {"logo": "https://placehold.co/100x100/420022/ff3366?text=LUD", "sound": ""},
+    "Achains": {"logo": "https://placehold.co/100x100/420022/0099ff?text=ACH", "sound": ""},
+    "Daddy's Dogs": {"logo": "https://placehold.co/100x100/420022/00cc66?text=DDG", "sound": ""},
+    "TDs and Beers": {"logo": "https://placehold.co/100x100/420022/ffcc00?text=TD", "sound": ""},
+    "DD Riders": {"logo": "https://placehold.co/100x100/420022/9933ff?text=DDR", "sound": ""},
+    "Nasty": {"logo": "https://placehold.co/100x100/420022/ffffff?text=NY", "sound": ""},
+    "Red Hammer": {"logo": "https://placehold.co/100x100/420022/ff3366?text=RH", "sound": ""},
+    "Expansion Team 15": {"logo": "https://placehold.co/100x100/420022/8b949e?text=E15", "sound": ""},
+    "Expansion Team 16": {"logo": "https://placehold.co/100x100/420022/8b949e?text=E16", "sound": ""}
 }
 
 DEFAULT_HORN = "https://actions.google.com/sounds/v1/alarms/air_horn_so_loud.ogg"
@@ -142,11 +144,9 @@ def trigger_draft_sound(team_name):
 
 FILE_NAME = "_NVFL Draft Sheet 2026.xlsx"
 
-# --- LIVE ADP DATA SYNC ENGINE (FAST TIMEOUT ON FAIL) ---
 @st.cache_data(ttl=21600)
 def fetch_live_adp():
     try:
-        # Lowered timeout to 2 seconds flat to prevent page locking
         url = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=12&year=2026"
         res = requests.get(url, timeout=2) 
         if res.status_code == 200:
@@ -165,7 +165,6 @@ def load_base_data():
     if os.path.exists(FILE_NAME):
         df = pd.read_excel(FILE_NAME, sheet_name='PlayerDB')
     else:
-        # Safety net fallback if local excel spreadsheet file isn't visible
         df = pd.DataFrame(columns=['Player', 'Team', 'Pos', 'Bye', 'PPR'])
     
     live_adp = fetch_live_adp()
@@ -179,7 +178,6 @@ def load_base_data():
 
 player_pool = load_base_data()
 
-# --- INITIALIZE CORE DRAFT SLOTS ---
 if 'custom_draft_order' not in st.session_state:
     order_map = {}
     for abs_pick in range(1, TOTAL_ABS_PICKS + 1):
@@ -196,13 +194,14 @@ if 'custom_draft_order' not in st.session_state:
                 order_map[abs_pick] = TEAMS_16[15 - pick_in_round]
     st.session_state.custom_draft_order = order_map
 
-# --- STATE MANAGEMENT ---
 if 'drafted_players' not in st.session_state:
     st.session_state.drafted_players = {}
 if 'current_absolute_pick' not in st.session_state:
     st.session_state.current_absolute_pick = 1
 if 'timer_start' not in st.session_state:
     st.session_state.timer_start = time.time()
+if 'time_limit' not in st.session_state:
+    st.session_state.time_limit = 90
 
 def get_draft_metadata(abs_pick):
     assigned_team = st.session_state.custom_draft_order.get(abs_pick, "Unknown")
@@ -216,34 +215,35 @@ def get_draft_metadata(abs_pick):
 
 otc_team, round_label, is_keeper_phase, display_pick_num = get_draft_metadata(st.session_state.current_absolute_pick)
 
+# --- ⏱️ DRAFT ROOM CLOCK (PLACED AT THE VERY TOP ABOVE HEADER) ---
+elapsed = int(time.time() - st.session_state.timer_start)
+remaining = max(0, st.session_state.time_limit - elapsed)
+
+clock_col1, clock_col2, clock_col3 = st.columns([1, 4, 1])
+with clock_col1:
+    if st.button("🔄 Reset Clock"):
+        st.session_state.timer_start = time.time()
+        st.rerun()
+with clock_col2:
+    st.progress(min(1.0, float(elapsed / st.session_state.time_limit)))
+with clock_col3:
+    if remaining > 0:
+        st.markdown(f"<h3 style='margin:0; text-align:center; color:#ffcc00;'>⏱️ {remaining}s</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='margin:0; color: #ff3366; text-align: center;'>⚠️ EXPIRED</h3>", unsafe_allow_html=True)
+
 # --- HEADER SECTION ---
-st.markdown(f"<h1 style='text-align: center; margin-bottom: 0px;'>🚨 NVFL DRAFT WAR ROOM 2026 🚨</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center; margin-bottom: 0px;'>💖 NVFL DRAFT WAR ROOM 2026 💖</h1>", unsafe_allow_html=True)
 st.markdown(f"<h3 style='text-align: center; color: #ffcc00; margin-top: 0px;'>{round_label.upper()} • {'KEEPER SLOT' if is_keeper_phase else f'PICK {display_pick_num}'} • {otc_team.upper()} IS ON THE CLOCK</h3>", unsafe_allow_html=True)
 st.markdown("---")
 
-# --- SIDEBAR CONTROLS ---
+# --- SIDEBAR Layout ---
 with st.sidebar:
+    # 1. USER IDENTITY (TOP)
     st.markdown("### 👤 User Identity Settings")
     user_team = st.selectbox("Select Your Managed Franchise:", ["Spectator / Commissioner Mode"] + TEAMS_16)
     
-    st.markdown("---")
-    st.markdown("### ⏱️ Draft Room Clock")
-    time_limit = st.number_input("Set Clock (Seconds)", min_value=15, max_value=300, value=90, step=15)
-    
-    elapsed = int(time.time() - st.session_state.timer_start)
-    remaining = max(0, time_limit - elapsed)
-    st.progress(min(1.0, float(elapsed / time_limit)))
-    
-    if remaining > 0:
-        st.metric(label="Time Remaining", value=f"{remaining}s")
-    else:
-        st.markdown("<h3 style='color: #ff3366; text-align: center;'>⚠️ CLOCK EXPIRED!</h3>", unsafe_allow_html=True)
-        
-    if st.button("🔄 Reset Timer"):
-        st.session_state.timer_start = time.time()
-        st.rerun()
-
-    # --- DYNAMIC PERSONALIZED QUEUE UPDATER ---
+    # 2. PERSONALIZED QUEUE / STATUS BANNERS (TOP)
     if user_team != "Spectator / Commissioner Mode":
         st.markdown("---")
         st.markdown("### 🚦 My Queue Status")
@@ -264,22 +264,61 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="status-banner status-waiting">⏳ You are drafting in {picks_away} picks.</div>', unsafe_allow_html=True)
 
-    # Cleaned image fallback paths to prevent local file asset crash loops
+    # 3. LIVE PLAYER SUBMISSION INTERFACE (TOP)
+    st.markdown("---")
+    st.markdown("### 🚀 Make Your Move")
+    st.info(f"Drafting for Slot Franchise: **{otc_team}**")
+    search_query = st.text_input("Search Available Player Name")
+    
+    taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
+    avail_df = player_pool[~player_pool['Player'].isin(taken_names)] if not player_pool.empty else pd.DataFrame()
+    
+    if search_query and not avail_df.empty:
+        avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
+        
+    if not avail_df.empty:
+        target_row = avail_df.iloc[0]
+        player_adp = target_row['PPR']
+        
+        if not is_keeper_phase and pd.notna(player_adp):
+            diff = round(display_pick_num - player_adp, 1)
+            diff_text = f"+{diff} (Steal)" if diff > 0 else f"{diff} (Reach)"
+            st.caption(f"📊 Market Live ADP: **{player_adp}** | Value Diff: **{diff_text}**")
+            
+        st.success(f"Top Match: {target_row['Player']} ({target_row['Pos']})")
+        if st.button("🔥 SUBMIT BOARD PICK"):
+            st.session_state.drafted_players[st.session_state.current_absolute_pick] = {
+                "Player": target_row['Player'],
+                "Pos": target_row['Pos'],
+                "Team": target_row['Team'],
+                "DraftedBy": otc_team,
+                "IsKeeper": is_keeper_phase
+            }
+            trigger_draft_sound(otc_team)
+            st.session_state.current_absolute_pick += 1
+            st.session_state.timer_start = time.time()
+            st.rerun()
+            
+    # 4. DECORATIVE ELEMENTS
     if os.path.exists("stare.png"):
         st.markdown(f"""
         <div class="stare-container">
-            <small style="color: #ff3366; font-family: 'Orbitron'; font-weight: bold; letter-spacing: 1px;">🚨 PRESSURE IS ON 🚨</small><br><br>
+            <small style="color: #ff007f; font-family: 'Orbitron'; font-weight: bold; letter-spacing: 1px;">🚨 PRESSURE IS ON 🚨</small><br><br>
             <img class="stare-img" src="app/static/stare.png">
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 🛠️ Commish Dashboard")
-    is_admin = st.checkbox("Enable Admin Drafting Mode", value=True)
+    # 5. ADMIN / CONFIGURATION UTILITIES (BOTTOM)
+    st.markdown("<br><br><br><hr style='border-top: 1px solid #660033;'>", unsafe_allow_html=True)
+    st.markdown("### 🛠️ Room Config & Administration (Bottom)")
     
+    # Room Timer Boundary Setting
+    st.session_state.time_limit = st.number_input("Adjust Clock Speed Limit (Seconds)", min_value=15, max_value=300, value=st.session_state.time_limit, step=15)
+
+    is_admin = st.checkbox("Enable Admin Panel Actions", value=True)
     if is_admin:
         with st.expander("⚙️ Swap Board Picks / Trade Manager"):
-            st.markdown("<small style='color: #8b949e;'>Trade absolute draft picks here.</small>", unsafe_allow_html=True)
+            st.markdown("<small style='color: #ecc4dc;'>Trade absolute draft picks here.</small>", unsafe_allow_html=True)
             pick_a = st.number_input("Pick X (Absolute #)", min_value=1, max_value=TOTAL_ABS_PICKS, value=33, step=1)
             pick_b = st.number_input("Pick Y (Absolute #)", min_value=1, max_value=TOTAL_ABS_PICKS, value=34, step=1)
             
@@ -291,39 +330,6 @@ with st.sidebar:
                 st.success(f"Swapped Picks!")
                 st.rerun()
                 
-        st.info(f"Drafting for: **{otc_team}**")
-        search_query = st.text_input("Search Available Player Name")
-        
-        taken_names = [p['Player'] for p in st.session_state.drafted_players.values()]
-        avail_df = player_pool[~player_pool['Player'].isin(taken_names)] if not player_pool.empty else pd.DataFrame()
-        
-        if search_query and not avail_df.empty:
-            avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
-            
-        if not avail_df.empty:
-            target_row = avail_df.iloc[0]
-            player_adp = target_row['PPR']
-            
-            if not is_keeper_phase and pd.notna(player_adp):
-                diff = round(display_pick_num - player_adp, 1)
-                diff_text = f"+{diff} (Steal)" if diff > 0 else f"{diff} (Reach)"
-                st.caption(f"📊 Market Live ADP: **{player_adp}** | Value Diff: **{diff_text}**")
-                
-            st.success(f"Top Match: {target_row['Player']} ({target_row['Pos']})")
-            if st.button("🚀 SUBMIT PICK"):
-                st.session_state.drafted_players[st.session_state.current_absolute_pick] = {
-                    "Player": target_row['Player'],
-                    "Pos": target_row['Pos'],
-                    "Team": target_row['Team'],
-                    "DraftedBy": otc_team,
-                    "IsKeeper": is_keeper_phase
-                }
-                trigger_draft_sound(otc_team)
-                st.session_state.current_absolute_pick += 1
-                st.session_state.timer_start = time.time()
-                st.rerun()
-        
-        st.markdown("---")
         if st.session_state.current_absolute_pick > 1:
             if st.button("⏪ UNDO LAST PICK"):
                 last_pick = st.session_state.current_absolute_pick - 1
@@ -363,8 +369,8 @@ with tab1:
                 k_cols[i-1].markdown(f"""
                 <div class="{card_style}" style="opacity: {opacity};">
                     <img class="team-logo-img" src="{k_logo}"><br>
-                    <small style="color: #8b949e;">{k_team[:8]}</small><br>
-                    <small style="color: #58a6ff; font-size:9px;">Abs {k_abs_pick}</small>
+                    <small style="color: #ecc4dc;">{k_team[:8]}</small><br>
+                    <small style="color: #ff007f; font-size:9px;">Abs {k_abs_pick}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -386,7 +392,7 @@ with tab1:
                 
                 cols[i-1].markdown(f"""
                 <div class="board-card board-card-{p_pos}">
-                    <small style="color: #8b949e;">Pk {reg_pick_offset}</small><br>
+                    <small style="color: #ecc4dc;">Pk {reg_pick_offset}</small><br>
                     <img class="team-logo-img" src="{team_logo}"><br>
                     <strong style="color: white; font-size: 12px;">{pick_data['Player'].split('–')[0]}</strong><br>
                     <span class="pos-badge pos-{p_pos}">{p_pos}</span>
@@ -399,10 +405,10 @@ with tab1:
                 
                 cols[i-1].markdown(f"""
                 <div class="{card_style}" style="opacity: {opacity};">
-                    <small style="color: #8b949e;">Pk {reg_pick_offset}</small><br>
+                    <small style="color: #ecc4dc;">Pk {reg_pick_offset}</small><br>
                     <img class="team-logo-img" src="{team_logo}"><br>
-                    <strong style="color: #8b949e; font-size: 10px;">{display_team[:8]}</strong><br>
-                    <small style="color: #58a6ff; font-size:9px;">Abs {calc_abs_pick}</small>
+                    <strong style="color: #ecc4dc; font-size: 10px;">{display_team[:8]}</strong><br>
+                    <small style="color: #ff007f; font-size:9px;">Abs {calc_abs_pick}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -433,7 +439,7 @@ with tab2:
                         st.markdown(f"""
                         <div class="cheat-row">
                             <strong>{p_name}</strong>
-                            <span style="color: #8b949e; font-size: 11px;">{adp_val}</span>
+                            <span style="color: #ecc4dc; font-size: 11px;">{adp_val}</span>
                         </div>
                         """, unsafe_allow_html=True)
                 else:
