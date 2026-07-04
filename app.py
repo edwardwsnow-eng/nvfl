@@ -139,45 +139,38 @@ def load_base_data():
 
 player_pool = load_base_data()
 
+# Initialize session state variables early for mapping persistence
+if 'drafted_players' not in st.session_state:
+    st.session_state.drafted_players = {}
+if 'current_absolute_pick' not in st.session_state:
+    st.session_state.current_absolute_pick = 1
+if 'selected_cheat_player' not in st.session_state:
+    st.session_state.selected_cheat_player = ""
+if 'saved_teams_list' not in st.session_state:
+    st.session_state.saved_teams_list = list(DEFAULT_14_TEAMS)
+
 # --- SIDEBAR CONFIGURATION ---
 with st.sidebar:
-    st.markdown("### ⚙️ [A] Draft Settings (14-Team Snake)")
-    
-    # Expandable manager to rename the 14 structural teams
-    with st.expander("Edit 14 Team Names Lineup"):
-        teams_14 = []
-        for i in range(14):
-            default_val = DEFAULT_14_TEAMS[i] if i < len(DEFAULT_14_TEAMS) else f"Team {i+1}"
-            t_name = st.text_input(f"Pick Slot #{i+1}", value=default_val, key=f"cfg_team_{i}")
-            teams_14.append(t_name if t_name.strip() else f"Team {i+1}")
+    # 1. PICK YOUR TEAM (Formerly Client Settings - Now Top)
+    st.markdown("### 👤 Pick your team")
+    user_team = st.selectbox("Franchise Context Identity:", ["Spectator / Commissioner Mode"] + st.session_state.saved_teams_list)
 
-    # Re-calculate the master multi-phase matrix dynamically if configurations change
+    # Master logic to generate matrix based on current team list state
     order_map = {}
     for abs_pick in range(1, TOTAL_ABS_PICKS + 1):
         if abs_pick <= TOTAL_KEEPER_PICKS:
             idx = (abs_pick - 1) % 14
-            order_map[abs_pick] = teams_14[idx]
+            order_map[abs_pick] = st.session_state.saved_teams_list[idx]
         else:
             reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
             round_num = ((reg_pick_num - 1) // 14) + 1
             pick_in_round = (reg_pick_num - 1) % 14
             if round_num % 2 != 0:
-                order_map[abs_pick] = teams_14[pick_in_round]
+                order_map[abs_pick] = st.session_state.saved_teams_list[pick_in_round]
             else:
-                order_map[abs_pick] = teams_14[14 - 1 - pick_in_round]
+                order_map[abs_pick] = st.session_state.saved_teams_list[14 - 1 - pick_in_round]
                 
     st.session_state.custom_draft_order = order_map
-
-    st.markdown("---")
-    st.markdown("### 👤 [B] Client Settings")
-    user_team = st.selectbox("Franchise Context Identity:", ["Spectator / Commissioner Mode"] + teams_14)
-
-    if 'drafted_players' not in st.session_state:
-        st.session_state.drafted_players = {}
-    if 'current_absolute_pick' not in st.session_state:
-        st.session_state.current_absolute_pick = 1
-    if 'selected_cheat_player' not in st.session_state:
-        st.session_state.selected_cheat_player = ""
 
     def get_draft_metadata(abs_pick):
         assigned_team = st.session_state.custom_draft_order.get(abs_pick, "Unknown")
@@ -206,8 +199,8 @@ with st.sidebar:
                 st.markdown(f'<div class="status-banner status-waiting">Drafting in {picks_away} picks</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### ⌨️ [C] Command Console")
     
+    # 2. ACTIVE TARGET LOOKUP (Command Console Title Completely Removed)
     default_search = st.session_state.selected_cheat_player if st.session_state.selected_cheat_player else ""
     search_query = st.text_input("Active Target Lookup", value=default_search)
     
@@ -244,8 +237,8 @@ with st.sidebar:
                 st.session_state.selected_cheat_player = ""  
                 st.rerun()
 
-    st.markdown("<br><br><hr style='border-color: #4a002a;'>", unsafe_allow_html=True)
-    st.markdown("### ⏪ [D] Overrides")
+    st.markdown("---")
+    st.markdown("### ⏪ Overrides")
     
     if st.session_state.current_absolute_pick > 1:
         if st.button("ROLLBACK LAST PICK", use_container_width=True):
@@ -253,6 +246,21 @@ with st.sidebar:
             if last_pick in st.session_state.drafted_players:
                 del st.session_state.drafted_players[last_pick]
             st.session_state.current_absolute_pick = last_pick
+            st.rerun()
+
+    st.markdown("<br><br><br><br><br><hr style='border-color: #4a002a;'>", unsafe_allow_html=True)
+    
+    # 3. DRAFT SETTINGS (Moved down low)
+    st.markdown("### ⚙️ Draft Settings (14-Team Snake)")
+    with st.expander("Edit 14 Team Names Lineup"):
+        updated_teams = []
+        for i in range(14):
+            default_val = st.session_state.saved_teams_list[i] if i < len(st.session_state.saved_teams_list) else f"Team {i+1}"
+            t_name = st.text_input(f"Pick Slot #{i+1}", value=default_val, key=f"cfg_team_{i}")
+            updated_teams.append(t_name if t_name.strip() else f"Team {i+1}")
+        
+        if updated_teams != st.session_state.saved_teams_list:
+            st.session_state.saved_teams_list = updated_teams
             st.rerun()
 
 # --- SPREADSHEET HEAD OVERVIEW ---
@@ -360,7 +368,7 @@ with tab2:
 with tab3:
     st.subheader("Master League Roster Grid")
     t_cols = st.columns(4)
-    for idx, t in enumerate(teams_14):
+    for idx, t in enumerate(st.session_state.saved_teams_list):
         with t_cols[idx % 4]:
             st.markdown(f"📝 **{t}**")
             t_picks = [p for p in st.session_state.drafted_players.values() if p['DraftedBy'] == t]
