@@ -1,7 +1,7 @@
-import streamlit as st
+
+   import streamlit as st
 import pandas as pd
 import os
-import time
 import requests
 
 # --- PAGE CONFIG ---
@@ -10,7 +10,6 @@ st.set_page_config(page_title="NVFL War Room 2026", layout="wide", initial_sideb
 # --- SPREADSHEET-STYLE ULTRA-COMPACT PINK CSS ---
 st.markdown("""
 <style>
-    /* Clean, Dense Spreadsheet Font & Background Overhaul */
     .stApp { 
         background-color: #1f0010; 
         color: #f0dbf4; 
@@ -22,8 +21,6 @@ st.markdown("""
         margin: 0px; 
         padding: 0px;
     }
-    
-    /* Strict Spreadsheet-Cell Borders & Compact Layout */
     .board-card {
         background: #2b0018;
         border: 1px solid #4a002a;
@@ -33,7 +30,6 @@ st.markdown("""
         font-size: 12px;
         line-height: 1.2;
     }
-    
     .rec-card {
         background: #380020;
         border: 1px solid #ff3399;
@@ -42,8 +38,6 @@ st.markdown("""
         margin: 4px 0px;
         font-size: 12px;
     }
-
-    /* Flat Spreadsheet Badges (No Neon Glow to Save Space) */
     .pos-badge { 
         padding: 1px 4px; 
         border-radius: 2px; 
@@ -60,7 +54,6 @@ st.markdown("""
     .pos-DEF { background-color: #6a0dad; }
     .pos-K { background-color: #e65c00; }
     
-    /* Tight Grid Cheat Sheet Cell Rows */
     .cheat-row {
         border-bottom: 1px solid #3d0022;
         padding: 2px 0px;
@@ -70,8 +63,6 @@ st.markdown("""
         color: #b589a6; 
         font-size: 11px;
     }
-
-    /* Sleek User Notice Banners */
     .status-banner {
         padding: 6px;
         border-radius: 2px;
@@ -84,7 +75,6 @@ st.markdown("""
     .status-next { background-color: #cc9900; color: black; }
     .status-waiting { background-color: #4a002a; color: #f0dbf4; border: 1px solid #66003b; }
     
-    /* Make Streamlit Native Form Inputs & Buttons Pack Closer Together */
     .stButton>button {
         padding: 2px 8px !important;
         font-size: 12px !important;
@@ -99,36 +89,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- TEAM MATRIX ---
-TEAM_ASSETS = {
-    "Sleeper Cell": {"logo": "https://placehold.co/100x100/2b0018/ff3366?text=SC", "sound": "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"},
-    "Phantasm": {"logo": "https://placehold.co/100x100/2b0018/0099ff?text=PH", "sound": ""},
-    "Icelanders": {"logo": "https://placehold.co/100x100/2b0018/00cc66?text=ICE", "sound": ""},
-    "El Nino": {"logo": "https://placehold.co/100x100/2b0018/ffcc00?text=EN", "sound": ""},
-    "Buttheads": {"logo": "https://placehold.co/100x100/2b0018/9933ff?text=BH", "sound": "https://actions.google.com/sounds/v1/sports/soccer_stadium_whistle.ogg"},
-    "Big Boys Big Work": {"logo": "https://placehold.co/100x100/2b0018/ffffff?text=BB", "sound": ""},
-    "Turbo-Ginz": {"logo": "https://placehold.co/100x100/2b0018/e67e22?text=TG", "sound": ""},
-    "Luddite": {"logo": "https://placehold.co/100x100/2b0018/ff3366?text=LUD", "sound": ""},
-    "Achains": {"logo": "https://placehold.co/100x100/2b0018/0099ff?text=ACH", "sound": ""},
-    "Daddy's Dogs": {"logo": "https://placehold.co/100x100/2b0018/00cc66?text=DDG", "sound": ""},
-    "TDs and Beers": {"logo": "https://placehold.co/100x100/2b0018/ffcc00?text=TD", "sound": ""},
-    "DD Riders": {"logo": "https://placehold.co/100x100/2b0018/9933ff?text=DDR", "sound": ""},
-    "Nasty": {"logo": "https://placehold.co/100x100/2b0018/ffffff?text=NY", "sound": ""},
-    "Red Hammer": {"logo": "https://placehold.co/100x100/2b0018/ff3366?text=RH", "sound": ""},
-    "Expansion Team 15": {"logo": "https://placehold.co/100x100/2b0018/8b949e?text=E15", "sound": ""},
-    "Expansion Team 16": {"logo": "https://placehold.co/100x100/2b0018/8b949e?text=E16", "sound": ""}
-}
+# --- DEFAULT TEAM LIST (14 TEAMS) ---
+DEFAULT_14_TEAMS = [
+    "Sleeper Cell", "Phantasm", "Icelanders", "El Nino", "Buttheads", 
+    "Big Boys Big Work", "Turbo-Ginz", "Luddite", "Achains", "Daddy's Dogs", 
+    "TDs and Beers", "DD Riders", "Nasty", "Red Hammer"
+]
 
 DEFAULT_HORN = "https://actions.google.com/sounds/v1/alarms/air_horn_so_loud.ogg"
-TEAMS_16 = list(TEAM_ASSETS.keys())
 TOTAL_REGULAR_ROUNDS = 15
-TOTAL_KEEPER_PICKS = 32
-TOTAL_ABS_PICKS = TOTAL_KEEPER_PICKS + (TOTAL_REGULAR_ROUNDS * 16)
+TOTAL_KEEPER_PICKS = 28  # 2 rounds * 14 teams
+TOTAL_ABS_PICKS = TOTAL_KEEPER_PICKS + (TOTAL_REGULAR_ROUNDS * 14)
 
-def trigger_draft_sound(team_name):
-    team_sound = TEAM_ASSETS.get(team_name, {}).get("sound", "")
-    final_audio_url = team_sound if team_sound else DEFAULT_HORN
-    st.markdown(f'<audio src="{final_audio_url}" autoplay></audio>', unsafe_allow_html=True)
+def trigger_draft_sound():
+    st.markdown(f'<audio src="{DEFAULT_HORN}" autoplay></audio>', unsafe_allow_html=True)
 
 FILE_NAME = "_NVFL Draft Sheet 2026.xlsx"
 
@@ -166,77 +140,60 @@ def load_base_data():
 
 player_pool = load_base_data()
 
-if 'custom_draft_order' not in st.session_state:
+# --- SIDEBAR CONFIGURATION ---
+with st.sidebar:
+    st.markdown("### ⚙️ [A] Draft Settings (14-Team Snake)")
+    
+    # Expandable manager to rename the 14 structural teams
+    with st.expander("Edit 14 Team Names Lineup"):
+        teams_14 = []
+        for i in range(14):
+            default_val = DEFAULT_14_TEAMS[i] if i < len(DEFAULT_14_TEAMS) else f"Team {i+1}"
+            t_name = st.text_input(f"Pick Slot #{i+1}", value=default_val, key=f"cfg_team_{i}")
+            teams_14.append(t_name if t_name.strip() else f"Team {i+1}")
+
+    # Re-calculate the master multi-phase matrix dynamically if configurations change
     order_map = {}
     for abs_pick in range(1, TOTAL_ABS_PICKS + 1):
         if abs_pick <= TOTAL_KEEPER_PICKS:
-            idx = (abs_pick - 1) % 16
-            order_map[abs_pick] = TEAMS_16[idx]
+            idx = (abs_pick - 1) % 14
+            order_map[abs_pick] = teams_14[idx]
         else:
             reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
-            round_num = ((reg_pick_num - 1) // 16) + 1
-            pick_in_round = (reg_pick_num - 1) % 16
+            round_num = ((reg_pick_num - 1) // 14) + 1
+            pick_in_round = (reg_pick_num - 1) % 14
             if round_num % 2 != 0:
-                order_map[abs_pick] = TEAMS_16[pick_in_round]
+                order_map[abs_pick] = teams_14[pick_in_round]
             else:
-                order_map[abs_pick] = TEAMS_16[15 - pick_in_round]
+                order_map[abs_pick] = teams_14[14 - 1 - pick_in_round]
+                
     st.session_state.custom_draft_order = order_map
 
-if 'drafted_players' not in st.session_state:
-    st.session_state.drafted_players = {}
-if 'current_absolute_pick' not in st.session_state:
-    st.session_state.current_absolute_pick = 1
-if 'timer_start' not in st.session_state:
-    st.session_state.timer_start = time.time()
-if 'time_limit' not in st.session_state:
-    st.session_state.time_limit = 90
-if 'selected_cheat_player' not in st.session_state:
-    st.session_state.selected_cheat_player = ""
+    st.markdown("---")
+    st.markdown("### 👤 [B] Client Settings")
+    user_team = st.selectbox("Franchise Context Identity:", ["Spectator / Commissioner Mode"] + teams_14)
 
-def get_draft_metadata(abs_pick):
-    assigned_team = st.session_state.custom_draft_order.get(abs_pick, "Unknown")
-    if abs_pick <= TOTAL_KEEPER_PICKS:
-        k_round = ((abs_pick - 1) // 16) + 1
-        return assigned_team, f"Keeper Rd {k_round}", True, abs_pick
-    
-    reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
-    round_num = ((reg_pick_num - 1) // 16) + 1
-    return assigned_team, f"Round {round_num}", False, reg_pick_num
+    if 'drafted_players' not in st.session_state:
+        st.session_state.drafted_players = {}
+    if 'current_absolute_pick' not in st.session_state:
+        st.session_state.current_absolute_pick = 1
+    if 'selected_cheat_player' not in st.session_state:
+        st.session_state.selected_cheat_player = ""
 
-otc_team, round_label, is_keeper_phase, display_pick_num = get_draft_metadata(st.session_state.current_absolute_pick)
+    def get_draft_metadata(abs_pick):
+        assigned_team = st.session_state.custom_draft_order.get(abs_pick, "Unknown")
+        if abs_pick <= TOTAL_KEEPER_PICKS:
+            k_round = ((abs_pick - 1) // 14) + 1
+            return assigned_team, f"Keeper Rd {k_round}", True, abs_pick
+        
+        reg_pick_num = abs_pick - TOTAL_KEEPER_PICKS
+        round_num = ((reg_pick_num - 1) // 14) + 1
+        return assigned_team, f"Round {round_num}", False, reg_pick_num
 
-# --- SPREADSHEET HEAD OVERVIEW & CLOCK WITH PINNED HEADER IMAGE ---
-elapsed = int(time.time() - st.session_state.timer_start)
-remaining = max(0, st.session_state.time_limit - elapsed)
-
-header_col1, header_col2, header_col3 = st.columns([3, 1, 1])
-
-with header_col1:
-    st.markdown(f"<h1 style='font-size: 20px; font-weight: 700; letter-spacing: -0.5px;'>🍸 NVFL WAR ROOM 2026</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color: #cc9900; font-size: 12px; margin: 0px;'>{round_label.upper()} • {'KEEPER PHASE' if is_keeper_phase else f'PICK {display_pick_num}'} • OTC: <b>{otc_team.upper()}</b></p>", unsafe_allow_html=True)
-
-with header_col2:
-    if os.path.exists("stare.png"):
-        st.image("stare.png", width=120)
-
-with header_col3:
-    if remaining > 0:
-        st.markdown(f"<p style='text-align: right; color: #cc9900; font-size: 18px; font-weight: bold; margin: 0px;'>⏱️ {remaining}s</p>", unsafe_allow_html=True)
-    else:
-        st.markdown("<p style='text-align: right; color: #ff3366; font-size: 18px; font-weight: bold; margin: 0px;'>⚠️ EXPIRED</p>", unsafe_allow_html=True)
-    st.progress(min(1.0, float(elapsed / st.session_state.time_limit)))
-
-st.markdown("<hr style='margin: 6px 0px; border-color: #4a002a;'>", unsafe_allow_html=True)
-
-# --- SIDEBAR ---
-with st.sidebar:
-    st.markdown("### [A] Client Settings")
-    user_team = st.selectbox("Franchise Context Identity:", ["Spectator / Commissioner Mode"] + TEAMS_16)
-    
+    otc_team, round_label, is_keeper_phase, display_pick_num = get_draft_metadata(st.session_state.current_absolute_pick)
     can_draft = (user_team == "Spectator / Commissioner Mode") or (user_team == otc_team)
     
     if user_team != "Spectator / Commissioner Mode":
-        st.markdown("---")
         upcoming_picks = [p_idx for p_idx, t_name in st.session_state.custom_draft_order.items() if t_name == user_team and p_idx >= st.session_state.current_absolute_pick]
         if not upcoming_picks:
             st.markdown('<div class="status-banner status-waiting">Roster Full</div>', unsafe_allow_html=True)
@@ -250,7 +207,7 @@ with st.sidebar:
                 st.markdown(f'<div class="status-banner status-waiting">Drafting in {picks_away} picks</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### [B] Command Console")
+    st.markdown("### ⌨️ [C] Command Console")
     
     default_search = st.session_state.selected_cheat_player if st.session_state.selected_cheat_player else ""
     search_query = st.text_input("Active Target Lookup", value=default_search)
@@ -262,6 +219,7 @@ with st.sidebar:
         avail_df = avail_df[avail_df['Player'].str.contains(search_query, case=False, na=False)]
         
     if not avail_df.empty:
+        avail_df = avail_df.sort_values(by='PPR', ascending=True)
         target_row = avail_df.iloc[0]
         player_adp = target_row['PPR']
         
@@ -282,43 +240,41 @@ with st.sidebar:
                     "DraftedBy": otc_team,
                     "IsKeeper": is_keeper_phase
                 }
-                trigger_draft_sound(otc_team)
+                trigger_draft_sound()
                 st.session_state.current_absolute_pick += 1
-                st.session_state.timer_start = time.time()
                 st.session_state.selected_cheat_player = ""  
                 st.rerun()
 
     st.markdown("<br><br><hr style='border-color: #4a002a;'>", unsafe_allow_html=True)
-    st.markdown("### [C] Overrides")
-    st.session_state.time_limit = st.number_input("Clock Config Value (s)", min_value=15, max_value=300, value=st.session_state.time_limit, step=15)
+    st.markdown("### ⏪ [D] Overrides")
+    
+    if st.session_state.current_absolute_pick > 1:
+        if st.button("ROLLBACK LAST PICK", use_container_width=True):
+            last_pick = st.session_state.current_absolute_pick - 1
+            if last_pick in st.session_state.drafted_players:
+                del st.session_state.drafted_players[last_pick]
+            st.session_state.current_absolute_pick = last_pick
+            st.rerun()
 
-    is_admin = st.checkbox("Show Board Swap Options", value=True)
-    if is_admin:
-        with st.expander("Mod Slot Assignments"):
-            pick_a = st.number_input("Slot Index A", min_value=1, max_value=TOTAL_ABS_PICKS, value=33)
-            pick_b = st.number_input("Slot Index B", min_value=1, max_value=TOTAL_ABS_PICKS, value=34)
-            if st.button("SWAP ASSIGNMENTS"):
-                st.session_state.custom_draft_order[pick_a], st.session_state.custom_draft_order[pick_b] = st.session_state.custom_draft_order[pick_b], st.session_state.custom_draft_order[pick_a]
-                st.success("Swapped")
-                st.rerun()
-                
-        if st.session_state.current_absolute_pick > 1:
-            if st.button("⏪ ROLLBACK LAST PICK", use_container_width=True):
-                last_pick = st.session_state.current_absolute_pick - 1
-                if last_pick in st.session_state.drafted_players:
-                    del st.session_state.drafted_players[last_pick]
-                st.session_state.current_absolute_pick = last_pick
-                st.session_state.timer_start = time.time()
-                st.rerun()
+# --- SPREADSHEET HEAD OVERVIEW ---
+header_col1, header_col2 = st.columns([4, 1])
+with header_col1:
+    st.markdown(f"<h1 style='font-size: 20px; font-weight: 700; letter-spacing: -0.5px;'>🍸 NVFL WAR ROOM 2026</h1>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color: #cc9900; font-size: 12px; margin: 0px;'>{round_label.upper()} • {'KEEPER PHASE' if is_keeper_phase else f'PICK {display_pick_num}'} • OTC: <b>{otc_team.upper()}</b></p>", unsafe_allow_html=True)
 
-# --- SPREADSHEET WORKBOOK WORKSPACE TABS ---
+with header_col2:
+    if os.path.exists("stare.png"):
+        st.image("stare.png", width=120)
+
+st.markdown("<hr style='margin: 6px 0px; border-color: #4a002a;'>", unsafe_allow_html=True)
+
+# --- WORKSPACE TABS ---
 tab1, tab2, tab3, tab4 = st.tabs(["🎯 My Team Dashboard", "📋 Interactive Cheat Sheets", "🏆 League Rosters", "📋 Live Drafted Breakdown"])
 
 with tab1:
     active_dashboard_team = user_team if user_team != "Spectator / Commissioner Mode" else otc_team
     st.markdown(f"#### Roster Worksheet: {active_dashboard_team.upper()}")
     
-    # --- PROJECTIONS ROW ---
     st.markdown("<p style='font-size:12px; font-weight:bold; color:#ff3399; margin-top:8px;'>🎯 RECOMMENDED AVAILABLE OPTIONS (SORTED BEST TO WORST)</p>", unsafe_allow_html=True)
     if not player_pool.empty:
         rec_pool = player_pool[~player_pool['Player'].isin(taken_names)].sort_values(by='PPR', ascending=True).head(3)
@@ -405,7 +361,7 @@ with tab2:
 with tab3:
     st.subheader("Master League Roster Grid")
     t_cols = st.columns(4)
-    for idx, t in enumerate(TEAMS_16):
+    for idx, t in enumerate(teams_14):
         with t_cols[idx % 4]:
             st.markdown(f"📝 **{t}**")
             t_picks = [p for p in st.session_state.drafted_players.values() if p['DraftedBy'] == t]
